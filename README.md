@@ -30,5 +30,10 @@ Adam W. Saxton | Microsoft Business Intelligence Server Escalation ServicesTwitt
 # DAX
 https://towardsdatascience.com/power-bi-what-is-dax-and-why-you-should-or-should-not-learn-it-1581aadbb038
 
+# Power BI Custom Connector
+https://docs.microsoft.com/en-us/power-query/creatingfirstconnector
+
+# Deep Dive into the M Language
+https://www.youtube.com/watch?v=ecfRTEoYadI
 
 
