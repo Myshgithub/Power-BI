@@ -33,6 +33,18 @@ https://towardsdatascience.com/power-bi-what-is-dax-and-why-you-should-or-should
 # Power BI Custom Connector
 https://docs.microsoft.com/en-us/power-query/creatingfirstconnector
 
+# View ConnectWise Data in Power BI via REST API
+This seems an interesting project related to Power BI that I get chance to be familiar with it as Deeloper Intern, and also go through ConnectWise as Developer too:
+https://developer.connectwise.com/Products/Manage
+https://developer.connectwise.com/Products/Manage/Developer_Guide
+
+https://developer.connectwise.com/Products/Manage/Developer_Guide#HTTP_Methods
+
+You can find about all the Connectwise Manage All Endpoints here: https://developer.connectwise.com/Products/Manage/REST#/
+But we used just https://developer.connectwise.com/Products/Manage/REST#/ServiceTicketLinks
+And this method for the specific project now: https://developer.connectwise.com/Products/Manage/Developer_Guide#HTTP_Methods
+
+
 # Deep Dive into the M Language
 https://www.youtube.com/watch?v=ecfRTEoYadI
 
