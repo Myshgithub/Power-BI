@@ -34,7 +34,7 @@ https://towardsdatascience.com/power-bi-what-is-dax-and-why-you-should-or-should
 https://docs.microsoft.com/en-us/power-query/creatingfirstconnector
 
 # View ConnectWise Data in Power BI via REST API
-This seems an interesting project related to Power BI that I get chance to be familiar with it as Deeloper Intern, and also go through ConnectWise as Developer too:
+This seems an interesting project related to Power BI that I get chance to be familiar with it as Developer Intern, and also go through ConnectWise as Developer too:
 https://developer.connectwise.com/Products/Manage
 https://developer.connectwise.com/Products/Manage/Developer_Guide
 
@@ -43,6 +43,17 @@ https://developer.connectwise.com/Products/Manage/Developer_Guide#HTTP_Methods
 You can find about all the Connectwise Manage All Endpoints here: https://developer.connectwise.com/Products/Manage/REST#/
 But we used just https://developer.connectwise.com/Products/Manage/REST#/ServiceTicketLinks
 And this method for the specific project now: https://developer.connectwise.com/Products/Manage/Developer_Guide#HTTP_Methods
+
+# Code and Samples
+Here from the following link you can find more about how to make your own custom connector, which is a simple one and good for starting "Hello World" data source:
+See the full sample for more information.
+https://github.com/microsoft/DataConnectors
+
+- The TripPin tutorial covers the creation of a new data source extension for Power Query, and is very helpful. This tutorial uses a public OData service (TripPin) as a reference source. Although this lesson requires the use of the M engine's OData functions, subsequent lessons will use "Web.Contents", making it applicable to (most) "REST APIs". I do recommend it.
+https://docs.microsoft.com/en-us/powerquery-m/web-contents
+
+The tutorial is meant to be done sequentially - each lesson builds on the connector created in previous lessons, incrementally adding new capabilities to your connector.
+https://github.com/microsoft/DataConnectors/tree/master/samples/TripPin
 
 
 # Deep Dive into the M Language
