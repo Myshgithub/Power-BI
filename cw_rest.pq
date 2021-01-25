@@ -1,0 +1,668 @@
+﻿// This file contains your Data Connector logic 
+/*section cw_rest;
+
+[DataSource.Kind="cw_rest", Publish="cw_rest.Publish"]
+shared cw_rest.Contents = (optional message as text) =>
+    let
+        _message = if (message <> null) then message else "(no message)",
+        a = "Hello from cw_rest: " & _message
+    in
+        a;
+
+// Data Source Kind description
+cw_rest = [
+    Authentication = [
+        // Key = [],
+        // UsernamePassword = [],
+        // Windows = [],
+        Implicit = []
+    ],
+    Label = Extension.LoadString("DataSourceLabel")
+];
+
+// Data Source UI publishing description
+cw_rest.Publish = [
+    Beta = true,
+    Category = "Other",
+    ButtonText = { Extension.LoadString("ButtonTitle"), Extension.LoadString("ButtonHelp") },
+    LearnMoreUrl = "https://powerbi.microsoft.com/",
+    SourceImage = cw_rest.Icons,
+    SourceTypeImage = cw_rest.Icons
+];
+
+cw_rest.Icons = [
+    Icon16 = { Extension.Contents("cw_rest16.png"), Extension.Contents("cw_rest20.png"), Extension.Contents("cw_rest24.png"), Extension.Contents("cw_rest32.png") },
+    Icon32 = { Extension.Contents("cw_rest32.png"), Extension.Contents("cw_rest40.png"), Extension.Contents("cw_rest48.png"), Extension.Contents("cw_rest64.png") }
+];
+
+
+///////////////////////
+/*
+// Logic to connect to and retrieve data from the connectwise rest api.
+section cw_rest;
+
+//
+// Definition
+//
+
+///[DataSource.Kind="cw_rest", Publish="cw_rest.Publish"] /*
+shared cw_rest.Contents = (optional message as text) =>
+    let
+        _message = if (message <> null) then message else "(no message)",
+        a = "Hello from cw_rest: " & _message
+    in
+        a;
+
+// Data Source Kind description
+// This section defines the credentials prompt in PBI
+cw_rest = [
+    TestConnection = (dataSourcePath) = { "cw_rest.Contents" },
+    Authentication = [
+        UsernamePassword = [
+            Label = "user name and pw",
+            UsernameLabel = "enter username",
+            PasswordLabel = "enter password"
+        ]
+    ],
+    Label = "Connectwise Manage Rest Connector"
+];
+
+// Data Source UI publishing description
+cw_rest.Publish = [
+    Beta = true,
+    Category = "Other",
+    ButtonText = { Extension.LoadString("ButtonTitle"), Extension.LoadString("ButtonHelp") },
+    LearnMoreUrl = "https://powerbi.microsoft.com/",
+    SourceImage = cw_rest.Icons,
+    SourceTypeImage = cw_rest.Icons
+];
+
+cw_rest.Icons = [
+    Icon16 = { Extension.Contents("cw_rest16.png"), Extension.Contents("cw_rest20.png"), Extension.Contents("cw_rest24.png"), Extension.Contents("cw_rest32.png") },
+    Icon32 = { Extension.Contents("cw_rest32.png"), Extension.Contents("cw_rest40.png"), Extension.Contents("cw_rest48.png"), Extension.Contents("cw_rest64.png") }
+];
+
+
+//
+// Implementation
+// 
+
+// Required headers for all Connectwise Manage API requests
+DefaultRequestHeaders = [
+    #"Accept" = "application/json",
+    #"ClientId" = "c545dcce-a20a-4440-9ade-3e89719a4a7c"
+
+];
+
+// Base Connectwise Manage API url
+BaseUrl = "https://api-na.myconnectwise.net/v4_6_release/apis/3.0/";
+
+// Endpoint specific fields and filter conditions
+ServiceTicketFields = "id,summary,recordType,board,status,company,siteName,city,stateIdentifier,contact,type,subType,priority,source,actualHours,closedDate,closedBy,closedFlag,respondMinutes,_info";
+ServiceTicketConditions = "board/name='End-User Requests' and _info/dateEntered>[2020-01-01T18:04:26Z]";
+CompanyFields = "id,name,userDefinedField10,status";
+ContactFields = "id,firstName,lastName,company,types";
+
+// Endpoint Urls
+ServiceTickets = "service/tickets?fields="&ServiceTicketFields&"&conditions="&ServiceTicketConditions&"&pageSize=1000";
+Companies = "company/companies?fields="&CompanyFields&"&orderBy=name asc&pagesize=500";
+Contacts = "company/contacts?fields="&ContactFields&"&orderBy=lastName asc&pagesize=500";
+///Contacts = "company/contacts?fields="&id,&firstName,&lastName,&company,&types&"&orderBy=lastName asc &pagesize=100";
+
+///Contacts = "company/contacts?fields="&contacts/id,&firstName,&lastName,&company,&types&"&orderBy=lastName asc &pagesize=500";
+///Differences between fields, Columns
+///company/companies?fields=company/id,company/name,phoneNumber
+///Columns (Reporting API only)	system/reports/service?columns=id,summary,company/name
+
+// API Endpointa
+RootEntities = { 
+    ServiceTickets,
+    Companies,
+    Contacts
+    
+    };
+
+
+SchemaTable = #table({"Entity", "SchemaTable"}, { 
+    {ServiceTickets,#table({"Name","Type"}, { 
+        {"id", type text},
+        {"summary", type text},
+        {"recordType", type text},
+        {"board", type record},
+        {"status", type record},
+        {"company", type record},
+        {"siteName", type text},
+        {"city", type text},
+        {"stateIdentifier", type text},
+        {"contact", type record},
+        {"type", type record},
+        {"subType", type record},
+        {"priority", type record},
+        {"source", type record},
+        {"actualHours", type text},
+        {"closedDate", type datetime},
+        {"closedBy", type text},
+        {"closedFlag", type text},
+        {"respondMinutes", type text},
+        {"_info", type record}
+
+    })},
+        {Companies,#table({"Name","Type"}, { 
+        {"id", type text},
+        {"name", type text},
+        {"status", type record}
+    })},
+
+   {Contacts,#table({"Name","Type"}, { 
+        {"id", type text},
+        {"firstName", type text},
+        {"lastName", type text},
+        {"Company", type record},
+        {"Types", type text}
+    })}
+
+});
+
+GetSchemaForEntity = (entity as text) as table => try SchemaTable{[Entity=entity]}[SchemaTable] otherwise error "Couldn't find entity: '" & entity &"'";
+
+[DataSource.Kind="cw_rest", Publish="cw_rest.Publish"]
+shared cw_rest.Contents = () => CWRestNavTable(BaseUrl) as table; 
+
+CWRestNavTable = (url as text) as table => 
+    let
+        entitiesAsTable = Table.FromList(RootEntities, Splitter.SplitByNothing()),
+        rename = Table.RenameColumns(entitiesAsTable, {{"Column1","Name"}}),
+        //Add Data
+        withData = Table.AddColumn(rename, "Data", each GetEntity(url, [Name]), type table),
+        withItemKind = Table.AddColumn(withData, "ItemKind", each "Table", type text),
+        withItemName = Table.AddColumn(withItemKind, "ItemName", each "Table", type text),
+        // Indicate that the node should not be expandable
+        withIsLeaf = Table.AddColumn(withItemName, "IsLeaf", each true, type logical),
+        // Generate the nav table
+        navTable = Table.ToNavigationTable(withIsLeaf, {"Name"}, "Name", "Data", "ItemKind", "ItemName", "IsLeaf")
+    in
+        navTable;
+
+CWRest.Feed = (url as text,  optional schema as table) as table => GetAllPagesByNextLink(url, schema);
+
+// Common functions
+//
+
+GetEntity = (url as text, entity as text) as table => 
+    let
+        fullUrl = Uri.Combine(url, entity),
+        schemaTable = GetSchemaForEntity(entity),
+        result = CWRest.Feed(fullUrl, schemaTable)
+    in
+        result;
+
+GetPage = (url as text, optional schema as table) as table => 
+    let
+        response = Web.Contents(url, [Headers = DefaultRequestHeaders]),
+        body = Json.Document(response),
+        nextLink = GetNextLink(response),
+        data = Table.FromRecords(body, schema[Name], MissingField.UseNull), 
+        withSchema = if (schema <> null) then SchemaTransformTable(data, schema) else data
+    in
+        withSchema meta [NextLink = nextLink];
+
+
+GetAllPagesByNextLink = (url as text, optional schema as table) as table =>
+    Table.GenerateByPage((previous) =>
+        let 
+            nextLink =  if (previous = null) then url else Value.Metadata(previous)[NextLink]?,
+            page = if (nextLink <> null) then GetPage(nextLink, schema) else null
+        in
+            page
+    );
+    
+GetNextLink = (response) as nullable text => 
+    let
+        metadata = Value.Metadata(response),
+        headers = metadata[Headers],
+        nextLink = Record.FieldOrDefault(headers, "Link"),
+        link = Text.Contains(nextLink, "next"),
+        url = if(link)=true then Text.BetweenDelimiters(nextLink,"<",">") else null
+    in
+        url;
+
+//
+// Common functions
+//
+Table.ToNavigationTable = (
+    table as table,
+    keyColumns as list,
+    nameColumn as text,
+    dataColumn as text,
+    itemKindColumn as text,
+    itemNameColumn as text,
+    isLeafColumn as text
+) as table =>
+    let
+        tableType = Value.Type(table),
+        newTableType = Type.AddTableKey(tableType, keyColumns, true) meta 
+        [
+            NavigationTable.NameColumn = nameColumn, 
+            NavigationTable.DataColumn = dataColumn,
+            NavigationTable.ItemKindColumn = itemKindColumn, 
+            Preview.DelayColumn = itemNameColumn, 
+            NavigationTable.IsLeafColumn = isLeafColumn
+        ],
+        navigationTable = Value.ReplaceType(table, newTableType)
+    in
+        navigationTable;
+
+Table.GenerateByPage = (getNextPage as function) as table =>
+    let        
+        listOfPages = List.Generate(
+            () => getNextPage(null),            // get the first page of data
+            (lastPage) => lastPage <> null,     // stop when the function returns null
+            (lastPage) => getNextPage(lastPage) // pass the previous page to the next function call
+        ),
+        // concatenate the pages together
+        tableOfPages = Table.FromList(listOfPages, Splitter.SplitByNothing(), {"Column1"}),
+        firstRow = tableOfPages{0}?
+    in
+        // if we didn't get back any pages of data, return an empty table
+        // otherwise set the table type based on the columns of the first page
+        if (firstRow = null) then
+            Table.FromRows({})
+        else        
+            Value.ReplaceType(
+                Table.ExpandTableColumn(tableOfPages, "Column1", Table.ColumnNames(firstRow[Column1])),
+                Value.Type(firstRow[Column1])
+            );
+
+//
+// Schema definitions
+//
+EnforceSchema.Strict = 1;               // Add any missing columns, remove extra columns, set table type
+EnforceSchema.IgnoreExtraColumns = 2;   // Add missing columns, do not remove extra columns
+EnforceSchema.IgnoreMissingColumns = 3; // Do not add or remove columns
+
+SchemaTransformTable = (table as table, schema as table, optional enforceSchema as number) as table =>
+    let
+        // Default to EnforceSchema.Strict
+        _enforceSchema = if (enforceSchema <> null) then enforceSchema else EnforceSchema.Strict,
+
+        // Applies type transforms to a given table
+        EnforceTypes = (table as table, schema as table) as table =>
+            let
+                map = (t) => if Type.Is(t, type list) or Type.Is(t, type record) or t = type any then null else t,
+                mapped = Table.TransformColumns(schema, {"Type", map}),
+                omitted = Table.SelectRows(mapped, each [Type] <> null),
+                existingColumns = Table.ColumnNames(table),
+                removeMissing = Table.SelectRows(omitted, each List.Contains(existingColumns, [Name])),
+                primativeTransforms = Table.ToRows(removeMissing),
+                changedPrimatives = Table.TransformColumnTypes(table, primativeTransforms)
+            in
+                changedPrimatives,
+
+        // Returns the table type for a given schema
+        SchemaToTableType = (schema as table) as type =>
+            let
+                toList = List.Transform(schema[Type], (t) => [Type=t, Optional=false]),
+                toRecord = Record.FromList(toList, schema[Name]),
+                toType = Type.ForRecord(toRecord, false)
+            in
+                type table (toType),
+
+        // Determine if we have extra/missing columns.
+        // The enforceSchema parameter determines what we do about them.
+        schemaNames = schema[Name],
+        foundNames = Table.ColumnNames(table),
+        addNames = List.RemoveItems(schemaNames, foundNames),
+        extraNames = List.RemoveItems(foundNames, schemaNames),
+        tmp = Text.NewGuid(),
+        added = Table.AddColumn(table, tmp, each []),
+        expanded = Table.ExpandRecordColumn(added, tmp, addNames),
+        result = if List.IsEmpty(addNames) then table else expanded,
+        fullList =
+            if (_enforceSchema = EnforceSchema.Strict) then
+                schemaNames
+            else if (_enforceSchema = EnforceSchema.IgnoreMissingColumns) then
+                foundNames
+            else
+                schemaNames & extraNames,
+
+        // Select the final list of columns.
+        // These will be ordered according to the schema table.
+        reordered = Table.SelectColumns(result, fullList, MissingField.Ignore),
+        enforcedTypes = EnforceTypes(reordered, schema),
+        withType = if (_enforceSchema = EnforceSchema.Strict) then Value.ReplaceType(enforcedTypes, SchemaToTableType(schema)) else enforcedTypes
+    in
+        withType;  
+*/
+//******************************************************************//
+
+// Logic to connect to and retrieve data from the connectwise rest api.
+section cw_rest;
+
+//
+// Definition
+//
+
+// Data Source Kind description
+// This section defines the credentials prompt in PBI
+cw_rest = [
+    TestConnection = (dataSourcePath) => { "cw_rest.Contents" },
+    Authentication = [
+        UsernamePassword = [
+            Label = "user name and pw",
+            UsernameLabel = "enter username",
+            PasswordLabel = "enter password"
+        ]
+    ],
+    Label = "Connectwise Manage Rest Connector"
+];
+
+
+
+// Data Source UI publishing description
+cw_rest.Publish = [
+    Beta = true,
+    Category = "Other",
+    ButtonText = { Extension.LoadString("ButtonTitle"), Extension.LoadString("ButtonHelp") },
+    LearnMoreUrl = "https://powerbi.microsoft.com/",
+    SourceImage = cw_rest.Icons,
+    SourceTypeImage = cw_rest.Icons
+];
+
+cw_rest.Icons = [
+    Icon16 = { Extension.Contents("cw_rest16.png"), Extension.Contents("cw_rest20.png"), Extension.Contents("cw_rest24.png"), Extension.Contents("cw_rest32.png") },
+    Icon32 = { Extension.Contents("cw_rest32.png"), Extension.Contents("cw_rest40.png"), Extension.Contents("cw_rest48.png"), Extension.Contents("cw_rest64.png") }
+];
+
+
+//
+// Implementation
+// 
+
+// Required headers for all Connectwise Manage API requests
+DefaultRequestHeaders = [
+    #"Accept" = "application/json",
+    #"ClientId" = "c545dcce-a20a-4440-9ade-3e89719a4a7c"
+
+];
+
+// Base Connectwise Manage API url
+BaseUrl = "https://api-na.myconnectwise.net/v4_6_release/apis/3.0/";
+// Endpoint specific fields and filter conditions
+ServiceTicketFields = "id,summary,recordType,board,status,company,siteName,city,stateIdentifier,contact,type,subType,priority,source,actualHours,closedDate,closedBy,closedFlag,respondMinutes,_info";
+ServiceTicketConditions = "board/name='End-User Requests' and _info/dateEntered>[2020-01-01T18:04:26Z]";
+CompanyFields = "id,name,userDefinedField10,status";
+sss= "company/contacts?types/id";
+ContactFields = "id,firstName,lastName,company,types&sss";
+///ChildContactConditions= "company/contacts/types?ChildContactConditions=Contacts/types/description = 'Decision Maker'";
+///ContactConditions= "types/description='Decision Maker'";
+//"description": "Decision Maker"
+//Contacts/types?ChildConditions=types/description like 'Decision Maker'
+///ChildContactConditions="types/description[value]='Decision Maker'";
+///ChildContactConditions="types/name/value like 'Decision Maker' ";
+///ChildContactConditions="types{1} ='Decision Maker' ";
+////ChildContactConditions="types/name like 'Decision Maker' ";  ///Good1
+///ChildContactConditions="[types.name]='Decision Maker'";  ///Good?
+Childconditions="types/id= 2";  ///Good??
+
+// Endpoint Urls
+ServiceTickets = "service/tickets?fields="&ServiceTicketFields&"&conditions="&ServiceTicketConditions&"&pageSize=1000";
+Companies = "company/companies?fields="&CompanyFields&"&orderBy=name asc&pagesize=500";
+
+Contacts = "company/contacts/?fields="&ContactFields&"&Childconditions="&Childconditions&"&pagesize=500";
+///Contacts = "company/contacts/?fields="&ContactFields&"&sss="&ChildContactConditions&"&pagesize=500";
+//Contactstypes="company/contacts/types?ChildContactConditions="
+
+///company/contacts?childconditions=communicationItems/value like "john@Outlook.com" AND communicationItems/communicationType="Email"
+
+///Contacts = "company/contacts?fields="&id&" "&firstName&";
+///Differences between fields, Columns
+///company/companies?fields=company/id,company/name,phoneNumber
+///Columns (Reporting API only)	system/reports/service?columns=id,summary,company/name
+
+///////////////////********************
+/*
+let
+    Source = cw_rest.Contents(),
+    #"company/contacts/?fields=id,firstName,lastName,company,types&sss=types/id= 2&pagesize=500" = Source{[Name="company/contacts/?fields=id,firstName,lastName,company,types&sss=types/id= 2&pagesize=500"]}[Data],
+    #"Expanded types" = Table.ExpandListColumn(#"company/contacts/?fields=id,firstName,lastName,company,types&sss=types/id= 2&pagesize=500", "types"),
+    #"Expanded types1" = Table.ExpandRecordColumn(#"Expanded types", "types", {"id", "name"}, {"types.id", "types.name"}),
+    #"Filtered Rows" = Table.SelectRows(#"Expanded types1", each ([types.name] = "Decision Maker"))
+in
+    #"Filtered Rows"
+
+*/
+////////////////////////**********************
+
+// API Endpointa
+RootEntities = { 
+    ServiceTickets,
+    Companies,
+    Contacts
+    
+    };
+
+
+SchemaTable = #table({"Entity", "SchemaTable"}, { 
+    {ServiceTickets,#table({"Name","Type"}, { 
+        {"id", type text},
+        {"summary", type text},
+        {"recordType", type text},
+        {"board", type record},
+        {"status", type record},
+        {"company", type record},
+        {"siteName", type text},
+        {"city", type text},
+        {"stateIdentifier", type text},
+        {"contact", type record},
+        {"type", type record},
+        {"subType", type record},
+        {"priority", type record},
+        {"source", type record},
+        {"actualHours", type text},
+        {"closedDate", type datetime},
+        {"closedBy", type text},
+        {"closedFlag", type text},
+        {"respondMinutes", type text},
+        {"_info", type record}
+
+    })},
+        {Companies,#table({"Name","Type"}, { 
+        {"id", type text},
+        {"name", type text},
+        {"status", type record}
+    })},
+
+   {Contacts,#table({"Name","Type"}, { 
+        {"id", type text},
+        {"firstName", type text},
+        {"lastName", type text},
+        {"company", type record},
+        ///{"types", List.MatchesAll(Contacts, ContactConditions)}
+        ///{"types", List.FindText(Type.ListItem, Text.Contains("Decision Maker"))}
+        ///{"types", List.FindText(Type.ListItem, "Decision Maker")}
+        ///{"types", List.Select(Type.ListItem(List.FindText()))}
+        ///{"types.description", type list}
+        {"types", type list}   ///Good1
+        
+    })}
+
+});
+
+GetSchemaForEntity = (entity as text) as table => try SchemaTable{[Entity=entity]}[SchemaTable] otherwise error "Couldn't find entity: '" & entity &"'";
+
+[DataSource.Kind="cw_rest", Publish="cw_rest.Publish"]
+shared cw_rest.Contents = () => CWRestNavTable(BaseUrl) as table; 
+
+CWRestNavTable = (url as text) as table => 
+    let
+        entitiesAsTable = Table.FromList(RootEntities, Splitter.SplitByNothing()),
+        rename = Table.RenameColumns(entitiesAsTable, {{"Column1","Name"}}),
+        //Add Data
+        withData = Table.AddColumn(rename, "Data", each GetEntity(url, [Name]), type table),
+        withItemKind = Table.AddColumn(withData, "ItemKind", each "Table", type text),
+        withItemName = Table.AddColumn(withItemKind, "ItemName", each "Table", type text),
+        // Indicate that the node should not be expandable
+        withIsLeaf = Table.AddColumn(withItemName, "IsLeaf", each true, type logical),
+        // Generate the nav table
+        navTable = Table.ToNavigationTable(withIsLeaf, {"Name"}, "Name", "Data", "ItemKind", "ItemName", "IsLeaf")
+    in
+        navTable;
+
+CWRest.Feed = (url as text,  optional schema as table) as table => GetAllPagesByNextLink(url, schema);
+
+// Common functions
+//
+
+GetEntity = (url as text, entity as text) as table => 
+    let
+        fullUrl = Uri.Combine(url, entity),
+        schemaTable = GetSchemaForEntity(entity),
+        result = CWRest.Feed(fullUrl, schemaTable)
+    in
+        result;
+
+GetPage = (url as text, optional schema as table) as table => 
+    let
+        response = Web.Contents(url, [Headers = DefaultRequestHeaders]),
+        body = Json.Document(response),
+        nextLink = GetNextLink(response),
+        data = Table.FromRecords(body, schema[Name], MissingField.UseNull), 
+        withSchema = if (schema <> null) then SchemaTransformTable(data, schema) else data
+    in
+        withSchema meta [NextLink = nextLink];
+
+
+GetAllPagesByNextLink = (url as text, optional schema as table) as table =>
+    Table.GenerateByPage((previous) =>
+        let 
+            nextLink =  if (previous = null) then url else Value.Metadata(previous)[NextLink]?,
+            page = if (nextLink <> null) then GetPage(nextLink, schema) else null
+        in
+            page
+    );
+    
+GetNextLink = (response) as nullable text => 
+    let
+        metadata = Value.Metadata(response),
+        headers = metadata[Headers],
+        nextLink = Record.FieldOrDefault(headers, "Link"),
+        link = Text.Contains(nextLink, "next"),
+        url = if(link)=true then Text.BetweenDelimiters(nextLink,"<",">") else null
+    in
+        url;
+
+//
+// Common functions
+//
+/////////////////////////**************************
+
+
+
+
+////////////////////////////*********************
+Table.ToNavigationTable = (
+    table as table,
+    keyColumns as list,
+    nameColumn as text,
+    dataColumn as text,
+    itemKindColumn as text,
+    itemNameColumn as text,
+    isLeafColumn as text
+) as table =>
+    let
+        tableType = Value.Type(table),
+        newTableType = Type.AddTableKey(tableType, keyColumns, true) meta 
+        [
+            NavigationTable.NameColumn = nameColumn, 
+            NavigationTable.DataColumn = dataColumn,
+            NavigationTable.ItemKindColumn = itemKindColumn, 
+            Preview.DelayColumn = itemNameColumn, 
+            NavigationTable.IsLeafColumn = isLeafColumn
+        ],
+        navigationTable = Value.ReplaceType(table, newTableType)
+    in
+        navigationTable;
+
+Table.GenerateByPage = (getNextPage as function) as table =>
+    let        
+        listOfPages = List.Generate(
+            () => getNextPage(null),            // get the first page of data
+            (lastPage) => lastPage <> null,     // stop when the function returns null
+            (lastPage) => getNextPage(lastPage) // pass the previous page to the next function call
+        ),
+        // concatenate the pages together
+        tableOfPages = Table.FromList(listOfPages, Splitter.SplitByNothing(), {"Column1"}),
+        firstRow = tableOfPages{0}?
+    in
+        // if we didn't get back any pages of data, return an empty table
+        // otherwise set the table type based on the columns of the first page
+        if (firstRow = null) then
+            Table.FromRows({})
+        else        
+            Value.ReplaceType(
+                Table.ExpandTableColumn(tableOfPages, "Column1", Table.ColumnNames(firstRow[Column1])),
+                Value.Type(firstRow[Column1])
+            );
+//////////////////////////////////////*************************//////////////////
+
+
+//
+// Schema definitions
+//
+EnforceSchema.Strict = 1;               // Add any missing columns, remove extra columns, set table type
+EnforceSchema.IgnoreExtraColumns = 2;   // Add missing columns, do not remove extra columns
+EnforceSchema.IgnoreMissingColumns = 3; // Do not add or remove columns
+
+SchemaTransformTable = (table as table, schema as table, optional enforceSchema as number) as table =>
+    let
+        // Default to EnforceSchema.Strict
+        _enforceSchema = if (enforceSchema <> null) then enforceSchema else EnforceSchema.Strict,
+
+        // Applies type transforms to a given table
+        EnforceTypes = (table as table, schema as table) as table =>
+            let
+                map = (t) => if Type.Is(t, type list) or Type.Is(t, type record) or t = type any then null else t,
+                mapped = Table.TransformColumns(schema, {"Type", map}),
+                omitted = Table.SelectRows(mapped, each [Type] <> null),
+                existingColumns = Table.ColumnNames(table),
+                removeMissing = Table.SelectRows(omitted, each List.Contains(existingColumns, [Name])),
+                primativeTransforms = Table.ToRows(removeMissing),
+                changedPrimatives = Table.TransformColumnTypes(table, primativeTransforms)
+            in
+                changedPrimatives,
+
+        // Returns the table type for a given schema
+        SchemaToTableType = (schema as table) as type =>
+            let
+                toList = List.Transform(schema[Type], (t) => [Type=t, Optional=false]),
+                toRecord = Record.FromList(toList, schema[Name]),
+                toType = Type.ForRecord(toRecord, false)
+            in
+                type table (toType),
+
+        // Determine if we have extra/missing columns.
+        // The enforceSchema parameter determines what we do about them.
+        schemaNames = schema[Name],
+        foundNames = Table.ColumnNames(table),
+        addNames = List.RemoveItems(schemaNames, foundNames),
+        extraNames = List.RemoveItems(foundNames, schemaNames),
+        tmp = Text.NewGuid(),
+        added = Table.AddColumn(table, tmp, each []),
+        expanded = Table.ExpandRecordColumn(added, tmp, addNames),
+        result = if List.IsEmpty(addNames) then table else expanded,
+        fullList =
+            if (_enforceSchema = EnforceSchema.Strict) then
+                schemaNames
+            else if (_enforceSchema = EnforceSchema.IgnoreMissingColumns) then
+                foundNames
+            else
+                schemaNames & extraNames,
+
+        // Select the final list of columns.
+        // These will be ordered according to the schema table.
+        reordered = Table.SelectColumns(result, fullList, MissingField.Ignore),
+        enforcedTypes = EnforceTypes(reordered, schema),
+        withType = if (_enforceSchema = EnforceSchema.Strict) then Value.ReplaceType(enforcedTypes, SchemaToTableType(schema)) else enforcedTypes
+    in
+        withType;
+
