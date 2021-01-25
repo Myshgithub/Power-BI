@@ -1,0 +1,7 @@
+let
+    Source = cw_rest.Contents(),
+    #"company/contacts/?fields=id,firstName,lastName,company,types&sss&Childconditions=types/id= 2&pagesize=500" = Source{[Name="company/contacts/?fields=id,firstName,lastName,company,types&sss&Childconditions=types/id= 2&pagesize=500"]}[Data],
+    #"Expanded types" = Table.ExpandListColumn(#"company/contacts/?fields=id,firstName,lastName,company,types&sss&Childconditions=types/id= 2&pagesize=500", "types"),
+    #"Expanded types1" = Table.ExpandRecordColumn(#"Expanded types", "types", {"id", "name"}, {"types.id", "types.name"})
+in
+    #"Expanded types1"
