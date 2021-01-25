@@ -25,3 +25,4 @@ This sample provides a simple data source extension that can be run in Visual St
 [Query]: ../../blobs/helloworld3.png "Hello World in the query editor"
 
 # Writing my own Custom Connector for Power BI Desktop in M Language with using Visual Studio 2019. The code files can be seen here:
+cw_rest Files
