@@ -1,0 +1,6 @@
+let
+    Source = cw_rest.Contents(),
+    #"company/companies?fields=id,name,userDefinedField10,status&orderBy=name asc&pagesize=500" = Source{[Name="company/companies?fields=id,name,userDefinedField10,status&orderBy=name asc&pagesize=500"]}[Data],
+    #"Expanded status" = Table.ExpandRecordColumn(#"company/companies?fields=id,name,userDefinedField10,status&orderBy=name asc&pagesize=500", "status", {"id", "name", "_info"}, {"status.id", "status.name", "status._info"})
+in
+    #"Expanded status"
